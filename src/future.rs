@@ -233,12 +233,14 @@ impl<'a, T> Drop for ReceiveFuture<'a, T> {
             if !internal.cancel_recv_signal(&self.sig) {
                 // a sender got signal ownership, receiver should wait until the response
                 if self.sig.async_blocking_wait() {
-                    if let Poll::Ready(success) = self.sig.poll() {
-                        if success {
-                            let data = unsafe { self.read_local_data() };
+                    if let Poll::Ready(true) = self.sig.poll() {
+                        let data = unsafe { self.read_local_data() };
+                        if let Some(recv) = internal.next_recv() {
+                            unsafe { recv.send(data) };
+                        } else {
                             internal.queue.push_front(data);
-                            return;
                         }
+                        return;
                     }
                     drop(internal);
 
